@@ -1,5 +1,7 @@
 # Pygame Adder
 
+**⚠ 因为使用了类型注解，但例如 `list[int, int]` 的类型注解需要 Python 3.9 及以上版本，但是 Python 3.9 及以上并不提供 Windows 7 及以下版本。请考虑升级 Windows（*不是强制的！您也可以通过导入 `__future__` 实现*）。**
+
 ## 基础介绍
 
 Pygame Adder 是一个 `Pygame` 的功能增强。它可以实现类似于 `PyQt` 的 GUI 功能，但受限于 `Pygame`。

@@ -1,5 +1,6 @@
 import pygame
 import typing
+import platform
 
 class Error(BaseException):
     def __init__(
@@ -25,8 +26,8 @@ def nothing(*args, **kwargs):
 _traced = []
 
 def initalize(
-        size: typing.Union(tuple[int, int], list[int, int])
-    ):
+        size: typing.Union[tuple[int, int], list[int, int]]
+    ) -> pygame.Surface:
     """
     初始化 Pygame
     :param size: 窗口大小
@@ -35,8 +36,14 @@ def initalize(
     pygame.init()
     return pygame.display.set_mode(size)
 
+def flush():
+    pygame.display.flip()
+    for component in Component._components:
+        component.flush()
+        pygame.display.get_surface().blit(component.image, component.rect)
+
 def clear(
-        bg_image_or_color: typing.Union(str, pygame.Surface, tuple[int, int, int], list[int, int, int]),
+        bg_image_or_color: typing.Union[str, pygame.Surface, tuple[int, int, int], list[int, int, int]],
         auto_resize: bool = False
     ):
     """
@@ -90,28 +97,52 @@ def untrace(
         raise Error(f"{component} 没有被跟踪，因此无法被移除。")
     _traced.remove(component)
 
+class Font(pygame.font.Font):
+    def __init__(
+            self,
+            font_name: str,
+            size: int,
+            bold: bool = False,
+            italic: bool = False,
+            underline: bool = False,
+            fgcolor: tuple[int, int, int] = (0, 0, 0),
+            bgcolor: typing.Union[type(None), tuple[int, int, int]] = None
+    ):
+        try:
+            super().__init__(font_name, size)
+        except FileNotFoundError:
+            # 使用的是系统字体名称，而不是 .ttf 字体文件
+            # 这里需要分情况（Windows、macOS 来看，后续可能会支持 Linux）
+            if "windows" in platform.platform().lower():
+                # Windows
+                super().__init__(f"C:/Windows/Fonts/{font_name}", size)
+        self.set_bold(bold)
+        self.set_italic(italic)
+        self.set_underline(underline)
+        self._fgcolor = fgcolor
+        self._bgcolor = bgcolor
+
 class Component(pygame.sprite.Sprite):
+    # 所有组件
+    _components: list["Component"] = []
+
     def __init__(
             self,
             events: dict,
             name: str
     ):
         """
-        Component，组件，程序中的每个交互元素（例如文本框等）都是组件。
-        :param events: 内容为：
-            {
-                "onclick":     nothing; # 鼠标单击
-                "doubleclick": nothing; # 鼠标双击
-            }
-            其中，若有一些项目没有填写绑定的函数，则默认执行空函数。
-        :param name: 组件的名称
+        https://github.com/dddddgz/pygame-adder/wiki/Component
         """
+        if not isinstance(events, dict):
+            raise f"events 参数存在错误：应该是 dict 类型，实际是 {str(type(events))[8:-2]}"
         self._events = events
         # 如果字典中找不到这些内容，就设为空函数
         for item in ["onclick", "ondoubleclick"]:
             if item not in events:
                 events[item] = nothing
         self._name = name
+        Component._components.append(self)
     
     def __getitem__(self, item):
         if item in self._events:
@@ -120,3 +151,24 @@ class Component(pygame.sprite.Sprite):
 
     def __repr__(self):
         return self._name
+
+    def flush(self):
+        """
+        为了将来的需求预留
+        """
+        pass
+
+class Label(Component):
+    def __init__(
+            self,
+            events: dict,
+            text: str,
+            font: "Font",
+            # anchor：预留
+            pos: tuple[int, int] = (0, 0)
+    ):
+        super().__init__(events, text)
+        self._font = font
+        self.image = self._font.render(text, False, self._font._fgcolor, self._font._bgcolor)
+        self.rect = self.image.get_rect()
+        self.rect.topleft = pos
