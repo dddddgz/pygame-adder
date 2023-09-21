@@ -2,6 +2,9 @@ import pygame
 import typing
 import platform
 
+# 定义 color 类型
+color = typing.Union[list[int, int, int], tuple[int, int, int]]
+
 class Error(BaseException):
     def __init__(
             self,
@@ -31,19 +34,23 @@ def initalize(
     """
     初始化 Pygame
     :param size: 窗口大小
+    :param bgcolor: 背景颜色
     :return: screen
     """
     pygame.init()
     return pygame.display.set_mode(size)
 
 def flush():
+    """
+    刷新屏幕上显示的所有内容
+    """
     pygame.display.flip()
     for component in Component._components:
         component.flush()
         pygame.display.get_surface().blit(component.image, component.rect)
 
 def clear(
-        bg_image_or_color: typing.Union[str, pygame.Surface, tuple[int, int, int], list[int, int, int]],
+        bg_image_or_color: typing.Union[color, pygame.Surface, str],
         auto_resize: bool = False
     ):
     """
@@ -97,31 +104,6 @@ def untrace(
         raise Error(f"{component} 没有被跟踪，因此无法被移除。")
     _traced.remove(component)
 
-class Font(pygame.font.Font):
-    def __init__(
-            self,
-            font_name: str,
-            size: int,
-            bold: bool = False,
-            italic: bool = False,
-            underline: bool = False,
-            fgcolor: tuple[int, int, int] = (0, 0, 0),
-            bgcolor: typing.Union[type(None), tuple[int, int, int]] = None
-    ):
-        try:
-            super().__init__(font_name, size)
-        except FileNotFoundError:
-            # 使用的是系统字体名称，而不是 .ttf 字体文件
-            # 这里需要分情况（Windows、macOS 来看，后续可能会支持 Linux）
-            if "windows" in platform.platform().lower():
-                # Windows
-                super().__init__(f"C:/Windows/Fonts/{font_name}", size)
-        self.set_bold(bold)
-        self.set_italic(italic)
-        self.set_underline(underline)
-        self._fgcolor = fgcolor
-        self._bgcolor = bgcolor
-
 class Component(pygame.sprite.Sprite):
     # 所有组件
     _components: list["Component"] = []
@@ -163,12 +145,15 @@ class Label(Component):
             self,
             events: dict,
             text: str,
-            font: "Font",
-            # anchor：预留
-            pos: tuple[int, int] = (0, 0)
+            font: pygame.font.Font,
+            pos: tuple[int, int],
+            fgcolor: color,
+            bgcolor: typing.Union[color, type(None)] = None,
+            anchor: str = "topleft"
     ):
         super().__init__(events, text)
         self._font = font
-        self.image = self._font.render(text, False, self._font._fgcolor, self._font._bgcolor)
+        self.image = self._font.render(text, False, fgcolor, bgcolor)
+        self._anchor = anchor
         self.rect = self.image.get_rect()
         self.rect.topleft = pos
