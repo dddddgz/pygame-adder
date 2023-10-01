@@ -1,6 +1,8 @@
 import pygame
 import typing
-import platform
+
+# 程序的配置
+config: dict = {}
 
 # 定义 color 类型
 color = typing.Union[list[int, int, int], tuple[int, int, int]]
@@ -49,38 +51,40 @@ def flush():
         component.flush()
         pygame.display.get_surface().blit(component.image, component.rect)
 
-def clear(
-        bg_image_or_color: typing.Union[color, pygame.Surface, str],
-        auto_resize: bool = False
+def to_surface(
+        x: typing.Union[color, str, pygame.Surface]
     ):
     """
-    清除屏幕。
-    :param bg_image_or_color: 可以是 RGB 颜色值，或者 Surface 和图片路径。
+    将 `[r, g, b], (r, g, b), 'path', Surface` 中的任何一个转换为 pygame.Surface 类型。
+    :param x: 如上所述。
+    :return: pygame.Surface
     """
-    screen = pygame.display.get_surface()
-    if isinstance(bg_image_or_color, tuple) or isinstance(bg_image_or_color, list):
+    if isinstance(x, tuple) or isinstance(x, list):
         # RGB 颜色值
-        bg_color = tuple(bg_image_or_color)
+        x = tuple(x)
+        if len(x) != 3:
+            raise Error(f"RGB 颜色值 {x} 的长度为 {len(x)} 而不是 3")
         for i in range(3):
-            color_i = bg_color[i]
+            color_i = x[i]
             if not (0 <= color_i < 256 and isinstance(color_i, int)):
                 # 不是正确的数
-                raise Error(f"RGB 颜色值 {bg_color} 中的 {'RGB'[i]} 元素不正确")
-        screen.fill(bg_color)
-    elif isinstance(bg_image_or_color, str):
+                raise Error(f"RGB 颜色值 {x} 中的 {'RGB'[i]} 元素不正确")
+    elif isinstance(x, str):
         # 是一张图片的名称
-        bg_image = pygame.image.load(bg_image_or_color)
-        if auto_resize:
-            bg_image = pygame.transform.scale(bg_image, screen.get_size())
-        screen.blit(bg_image, (0, 0))
-    elif isinstance(bg_image_or_color, pygame.Surface):
+        x = pygame.image.load(x)
+    elif isinstance(x, pygame.Surface):
         # 是一个 Surface
-        bg_image = bg_image_or_color
-        if auto_resize:
-            bg_image = pygame.transform.scale(bg_image, screen.get_size())
-        screen.blit(bg_image, (0, 0))
+        x = x
     else:
-        raise Error(f"{bg_image_or_color} 的类型不正确：它只能为本地图片或者 RGB。")
+        raise Error(f"{x} 的类型不正确：它只能为本地图片或者 RGB。")
+
+def set_background(background, autoresize):
+    """
+    设置清除屏幕时，显示的背景。
+    :param background: 背景，可以是 RGB 或者图像。
+    """
+    background = to_surface(background)
+    config["background"] = [background, autoresize]
 
 def trace(
         component: "Component"
