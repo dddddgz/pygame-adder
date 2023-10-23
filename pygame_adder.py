@@ -53,6 +53,7 @@ def initalize(
     pygame.init()
     screen = pygame.display.set_mode(size)
     screen.fill(bgcolor)
+    pygame.display.set_caption(caption)
     pygame.display.set_icon(to_surface(icon))
     return screen
 
@@ -63,7 +64,7 @@ def is_valid(value, format):
     :param format: 格式
     """
     if format == "color":
-        
+        pass
 
 def flush():
     """
