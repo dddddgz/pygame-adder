@@ -1,11 +1,19 @@
 import pygame
 import typing
+import platform
+# 部分功能需要调用系统命令行
+from os import system
 
 # 程序的配置
 config: dict = {}
 
-# 定义 color 类型
+# 定义 color 类型，用于表示一个颜色
 color = typing.Union[list[int, int, int], tuple[int, int, int]]
+# 定义 image 类型，用于表示一个表面
+image = typing.Union[pygame.Surface, str]
+
+# 提前获取系统版本
+_system = platform.system().lower()
 
 class Error(BaseException):
     def __init__(
@@ -31,7 +39,10 @@ def nothing(*args, **kwargs):
 _traced = []
 
 def initalize(
-        size: typing.Union[tuple[int, int], list[int, int]]
+        size: typing.Union[tuple[int, int], list[int, int]],
+        bgcolor: color = (0, 0, 0),
+        caption: str = "Pygame Adder Window",
+        icon: pygame.Surface = "favicon.png",
     ) -> pygame.Surface:
     """
     初始化 Pygame
@@ -40,7 +51,19 @@ def initalize(
     :return: screen
     """
     pygame.init()
-    return pygame.display.set_mode(size)
+    screen = pygame.display.set_mode(size)
+    screen.fill(bgcolor)
+    pygame.display.set_icon(to_surface(icon))
+    return screen
+
+def is_valid(value, format):
+    """
+    检查某个值是否符合正确格式
+    :param value: 值
+    :param format: 格式
+    """
+    if format == "color":
+        
 
 def flush():
     """
@@ -52,31 +75,45 @@ def flush():
         pygame.display.get_surface().blit(component.image, component.rect)
 
 def to_surface(
-        x: typing.Union[color, str, pygame.Surface]
+        x: image
     ):
     """
-    将 `[r, g, b], (r, g, b), 'path', Surface` 中的任何一个转换为 pygame.Surface 类型。
+    将 `'path', Surface` 中的任何一个转换为 pygame.Surface 类型，如果表示路径，也可以是一张网络图片。
     :param x: 如上所述。
     :return: pygame.Surface
     """
-    if isinstance(x, tuple) or isinstance(x, list):
-        # RGB 颜色值
-        x = tuple(x)
-        if len(x) != 3:
-            raise Error(f"RGB 颜色值 {x} 的长度为 {len(x)} 而不是 3")
-        for i in range(3):
-            color_i = x[i]
-            if not (0 <= color_i < 256 and isinstance(color_i, int)):
-                # 不是正确的数
-                raise Error(f"RGB 颜色值 {x} 中的 {'RGB'[i]} 元素不正确")
-    elif isinstance(x, str):
+    if isinstance(x, str):
         # 是一张图片的名称
-        x = pygame.image.load(x)
+        if x.startswith("http"):
+            # 是网络图片
+            image_name = x.split('/')[-1]
+            if _system == "windows":
+                # windows 系统，使用 curl
+                system(f"curl {x} -o {image_name}")
+            elif _system == "darwin":
+                # mac 系统，使用 curl
+                system(f"curl -O {x}")
+            elif _system == "linux":
+                # linux 系统，使用 wget
+                system(f"wget -O {image_name} {x}")
+            else:
+                raise Error(f"未识别的系统：{_system}请前往 https://github.com/dddddgz/pygame-adder/issues 进行反馈。")
+            x = to_surface(image_name)
+            if _system == "windows":
+                system(f"del {image_name}")
+            elif _system == "darwin":
+                system(f"rm {image_name}")
+            elif _system == "linux":
+                system(f"rm {image_name}")
+        else:
+            # 是本地图片
+            x = pygame.image.load(x)
     elif isinstance(x, pygame.Surface):
         # 是一个 Surface
         x = x
     else:
-        raise Error(f"{x} 的类型不正确：它只能为本地图片或者 RGB。")
+        raise Error(f"{x} 的类型不正确：它只能为图片。")
+    return x
 
 def set_background(background, autoresize):
     """
