@@ -52,19 +52,36 @@ def initalize(
     """
     pygame.init()
     screen = pygame.display.set_mode(size)
-    screen.fill(bgcolor)
+    if is_valid(bgcolor):
+        screen.fill(bgcolor)
     pygame.display.set_caption(caption)
     pygame.display.set_icon(to_surface(icon))
     return screen
 
 def is_valid(value, format):
     """
-    检查某个值是否符合正确格式
+    检查某个值是否符合正确格式，如果不符合直接 raise 报错
     :param value: 值
     :param format: 格式
     """
     if format == "color":
-        pass
+        # 是元组或列表
+        if isinstance(value, tuple) or isinstance(value, list):
+            # 长度正常
+            if len(value) == 3:
+                # 都是整数
+                if isinstance(value[0], int) and isinstance(value[1], int) and isinstance(value[2], int):
+                    # 正常
+                    return True
+                # 不是整数
+                else:
+                    raise Error(f"{value} 中的某个/某些值不是整数")
+            # 长度异常
+            else:
+                raise Error(f"{value} 的长度应该是 3，而不是 {len(value)}")
+        # 格式错误
+        else:
+            raise Error(f"{value} 的类型应该是 tuple 或 list，而不是 {type(value)}")
 
 def flush():
     """
@@ -195,6 +212,8 @@ class Label(Component):
     ):
         super().__init__(events, text)
         self._font = font
+        is_valid(fgcolor)
+        is_valid(bgcolor)
         self.image = self._font.render(text, False, fgcolor, bgcolor)
         self._anchor = anchor
         self.rect = self.image.get_rect()
