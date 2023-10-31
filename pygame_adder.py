@@ -1,17 +1,18 @@
 import pygame
 import typing
 import platform
-# 部分功能需要调用系统命令行
 from os import system
+from time import perf_counter_ns
 
 # 程序的配置
-config: dict = {}
+_config: dict = {}
 
 NoneType = type(None)
 color = typing.Union[list[int, int, int], tuple[int, int, int]] # 用于表示一个颜色
 image = typing.Union[pygame.Surface, str]                       # 用于表示一个表面
 
 _system = platform.system().lower()     # 提前获取系统版本
+quit = pygame.quit
 
 class Error(BaseException):
     def __init__(
@@ -91,7 +92,7 @@ def flush():
     """
     # 先获取系统背景
     screen = pygame.display.get_surface()
-    screen.blit(config["background"], (0, 0))
+    screen.blit(_config["background"], (0, 0))
     for component in _traced:
         component.flush()
         screen.blit(component.image, component.rect)
@@ -120,7 +121,7 @@ def to_surface(
                 # linux 系统，使用 wget
                 system(f"wget -O {image_name} {x}")
             else:
-                raise Error(f"未识别的系统：{_system}请前往 https://github.com/dddddgz/pygame-adder/issues 进行反馈。")
+                raise Error(f"未识别的系统：{_system}。请前往 https://github.com/dddddgz/pygame-adder/issues 进行反馈。")
             x = to_surface(image_name)
             if _system == "windows":
                 system(f"del {image_name}")
@@ -153,14 +154,14 @@ def new_surface(
     return surface
 
 def set_background(
-        background
+        background: pygame.Surface
     ):
     """
     设置清除屏幕时，显示的背景。
-    :param background: 背景，可以是 RGB 或者图像。
+    :param background: 背景，只能是图像或图片路径/网络图片。
     """
     background = to_surface(background)
-    config["background"] = background
+    _config["background"] = background
 
 def trace(
         component: "Component"
@@ -170,7 +171,7 @@ def trace(
     :param component: 组件
     """
     if component in _traced:
-        raise Error(f"重复跟踪 {component}：它已经在 {_traced.index(component)} 位置被跟踪了")
+        raise Error(f"重复跟踪 {component}：它已经在 {_traced.index(component)} 位置被跟踪了。")
     _traced.append(component)
 
 def untrace(
@@ -185,9 +186,6 @@ def untrace(
     _traced.remove(component)
 
 class Component(pygame.sprite.Sprite):
-    # 所有组件
-    _components: list["Component"] = []
-
     def __init__(
         self,
         events: dict,
@@ -204,7 +202,6 @@ class Component(pygame.sprite.Sprite):
             if item not in events:
                 events[item] = nothing
         self._name = name
-        Component._components.append(self)
     
     def __getitem__(self, item):
         if item in self._events:
@@ -261,7 +258,8 @@ class Button(Component):
         size: tuple[int, int],
         fgcolor: color,
         bgcolor: color,
-        anchor: str = "topleft"
+        func,
+        anchor: str = "topleft",
     ):
         super().__init__(events, name)
         is_valid(fgcolor, "color")
@@ -271,6 +269,8 @@ class Button(Component):
         text_surf = font.render(text, False, fgcolor)   # 按钮上的文字
         text_rect = text_surf.get_rect()                # 给文字使用 Rect，便于固定在中心
         text_rect.center = (size[0] // 2, size[1] // 2) # 设置中心点
+        self._func = func
+        self._last_clicked = perf_counter_ns()
         self.image.blit(text_surf, text_rect)
         self._anchor = anchor
         self.rect = self.image.get_rect(**{anchor: pos})
@@ -282,3 +282,12 @@ class Button(Component):
         anchor_pos = self.rect.__getattribute__(self._anchor)
         self.rect = self.image.get_rect()
         self.rect.__setattr__(self._anchor, anchor_pos)
+        if self.rect.collidepoint(pygame.mouse.get_pos()):  # 鼠标移到了按钮上面
+            if pygame.mouse.get_pressed()[0]:               # 鼠标左键按下
+                last = self._last_clicked                   # 保留上次时间
+                self._last_clicked = perf_counter_ns()      # 标记当前时间
+                if self._last_clicked - last > 1_0000_0000: # 距离上一次按钮被点击超过了一亿纳秒（0.1 秒）
+                    self._func()                            # 执行函数
+        #    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+        # else:
+        #     pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
