@@ -7,13 +7,11 @@ from os import system
 # 程序的配置
 config: dict = {}
 
-# 定义 color 类型，用于表示一个颜色
-color = typing.Union[list[int, int, int], tuple[int, int, int]]
-# 定义 image 类型，用于表示一个表面
-image = typing.Union[pygame.Surface, str]
+NoneType = type(None)
+color = typing.Union[list[int, int, int], tuple[int, int, int]] # 用于表示一个颜色
+image = typing.Union[pygame.Surface, str]                       # 用于表示一个表面
 
-# 提前获取系统版本
-_system = platform.system().lower()
+_system = platform.system().lower()     # 提前获取系统版本
 
 class Error(BaseException):
     def __init__(
@@ -27,7 +25,7 @@ class Error(BaseException):
         self._message = message
     
     def __str__(self):
-        return self.message
+        return self._message
 
 def nothing(*args, **kwargs):
     """
@@ -52,8 +50,12 @@ def initalize(
     """
     pygame.init()
     screen = pygame.display.set_mode(size)
-    if is_valid(bgcolor, "color"):
-        screen.fill(bgcolor)
+    try:
+        is_valid(bgcolor, "color")  # 是颜色，不是背景图片
+        set_background(new_surface(size, bgcolor))
+    except:
+        # 不是颜色，那么检查是不是背景图
+        raise
     pygame.display.set_caption(caption)
     pygame.display.set_icon(to_surface(icon))
     return screen
@@ -87,10 +89,13 @@ def flush():
     """
     刷新屏幕上显示的所有内容
     """
-    pygame.display.flip()
-    for component in Component._components:
+    # 先获取系统背景
+    screen = pygame.display.get_surface()
+    screen.blit(config["background"], (0, 0))
+    for component in _traced:
         component.flush()
-        pygame.display.get_surface().blit(component.image, component.rect)
+        screen.blit(component.image, component.rect)
+    pygame.display.flip()
 
 def to_surface(
         x: image
@@ -133,13 +138,29 @@ def to_surface(
         raise Error(f"{x} 的类型不正确：它只能为图片。")
     return x
 
-def set_background(background, autoresize):
+def new_surface(
+        size: tuple[int, int],
+        bgcolor: color
+    ) -> pygame.Surface:
+    """
+    使用背景色快速创建一个 Surface。
+    :param size: Surface 大小。
+    :param bgcolor: 背景颜色。
+    :return: pygame.Surface
+    """
+    surface = pygame.Surface(size)
+    surface.fill(bgcolor)
+    return surface
+
+def set_background(
+        background
+    ):
     """
     设置清除屏幕时，显示的背景。
     :param background: 背景，可以是 RGB 或者图像。
     """
     background = to_surface(background)
-    config["background"] = [background, autoresize]
+    config["background"] = background
 
 def trace(
         component: "Component"
@@ -168,9 +189,9 @@ class Component(pygame.sprite.Sprite):
     _components: list["Component"] = []
 
     def __init__(
-            self,
-            events: dict,
-            name: str
+        self,
+        events: dict,
+        name: str
     ):
         """
         https://github.com/dddddgz/pygame-adder/wiki/Component
@@ -195,21 +216,24 @@ class Component(pygame.sprite.Sprite):
 
     def flush(self):
         """
-        为了将来的需求预留
+        由子类写，Component.flush() 用来摸鱼
         """
         pass
 
 class Label(Component):
     def __init__(
-            self,
-            events: dict,
-            text: str,
-            font: pygame.font.Font,
-            pos: tuple[int, int],
-            fgcolor: color,
-            bgcolor: typing.Union[color, type(None)] = None,
-            anchor: str = "topleft"
+        self,
+        events: dict,
+        text: str,
+        font: pygame.font.Font,
+        pos: tuple[int, int],
+        fgcolor: color,
+        bgcolor: typing.Union[color, type(None)] = None,
+        anchor: str = "topleft"
     ):
+        """
+        https://github.com/dddddgz/pygame-adder/wiki/Label
+        """
         super().__init__(events, text)
         self._font = font
         is_valid(fgcolor, "color")
@@ -217,5 +241,44 @@ class Label(Component):
             is_valid(bgcolor, "color")
         self.image = self._font.render(text, False, fgcolor, bgcolor)
         self._anchor = anchor
+        self.rect = self.image.get_rect(**{anchor: pos})
+    
+    def flush(self):
+        """
+        刷新对象
+        """
+        anchor_pos = self.rect.__getattribute__(self._anchor)
         self.rect = self.image.get_rect()
-        self.rect.topleft = pos
+        self.rect.__setattr__(self._anchor, anchor_pos)
+
+class Button(Component):
+    def __init__(self,
+        events: dict,
+        name: str,
+        text: str,
+        font: pygame.font.Font,
+        pos: tuple[int, int],
+        size: tuple[int, int],
+        fgcolor: color,
+        bgcolor: color,
+        anchor: str = "topleft"
+    ):
+        super().__init__(events, name)
+        is_valid(fgcolor, "color")
+        if bgcolor is not None:
+            is_valid(bgcolor, "color")
+        self.image = new_surface(size, bgcolor)
+        text_surf = font.render(text, False, fgcolor)   # 按钮上的文字
+        text_rect = text_surf.get_rect()                # 给文字使用 Rect，便于固定在中心
+        text_rect.center = (size[0] // 2, size[1] // 2) # 设置中心点
+        self.image.blit(text_surf, text_rect)
+        self._anchor = anchor
+        self.rect = self.image.get_rect(**{anchor: pos})
+    
+    def flush(self):
+        """
+        刷新对象
+        """
+        anchor_pos = self.rect.__getattribute__(self._anchor)
+        self.rect = self.image.get_rect()
+        self.rect.__setattr__(self._anchor, anchor_pos)
