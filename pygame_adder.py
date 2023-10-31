@@ -52,7 +52,7 @@ def initalize(
     """
     pygame.init()
     screen = pygame.display.set_mode(size)
-    if is_valid(bgcolor):
+    if is_valid(bgcolor, "color"):
         screen.fill(bgcolor)
     pygame.display.set_caption(caption)
     pygame.display.set_icon(to_surface(icon))
@@ -212,8 +212,9 @@ class Label(Component):
     ):
         super().__init__(events, text)
         self._font = font
-        is_valid(fgcolor)
-        is_valid(bgcolor)
+        is_valid(fgcolor, "color")
+        if bgcolor is not None:
+            is_valid(bgcolor, "color")
         self.image = self._font.render(text, False, fgcolor, bgcolor)
         self._anchor = anchor
         self.rect = self.image.get_rect()
