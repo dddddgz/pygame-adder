@@ -3,7 +3,7 @@ from webbrowser import open as open_webpage
 
 initalize((640, 480))
 
-font30 = pygame.font.SysFont("更纱黑体 SC", 30)
+font30 = pygame.font.SysFont("Microsoft YaHei UI", 30)
 label = Label({}, "欢迎来到 Pygame Adder 的世界", font30, (100, 100), (255, 255, 255))
 trace(label)
 button = Button({}, "btn1", "开始", font30, (100, 200), (200, 75), (255, 255, 255), (34, 177, 76), lambda: open_webpage("https://github.com/dddddgz/Pygame-Adder/wiki"))

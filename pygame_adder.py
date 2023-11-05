@@ -90,12 +90,19 @@ def flush():
     """
     刷新屏幕上显示的所有内容
     """
-    # 先获取系统背景
-    screen = pygame.display.get_surface()
-    screen.blit(_config["background"], (0, 0))
-    for component in _traced:
-        component.flush()
-        screen.blit(component.image, component.rect)
+    screen = pygame.display.get_surface()                       # 获取当前 screen
+    screen.blit(_config["background"], (0, 0))                  # 在 screen 上绘制添加背景
+    flag = False                                                # 是否已处理鼠标 hover 事件
+    for component in _traced:                                   # 遍历已跟踪的 Component
+        component.flush()                                       # 刷新 Component
+        screen.blit(component.image, component.rect)            # 绘制 Component
+        if flag:
+            continue
+        if component.rect.collidepoint(pygame.mouse.get_pos()): # 如果鼠标悬浮在 component 上方
+            pygame.mouse.set_cursor(component._cursor)
+            flag = True
+    if not flag:
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
     pygame.display.flip()
 
 def to_surface(
@@ -189,7 +196,8 @@ class Component(pygame.sprite.Sprite):
     def __init__(
         self,
         events: dict,
-        name: str
+        name: str,
+        cursor: int = pygame.SYSTEM_CURSOR_ARROW
     ):
         """
         https://github.com/dddddgz/pygame-adder/wiki/Component
@@ -202,6 +210,7 @@ class Component(pygame.sprite.Sprite):
             if item not in events:
                 events[item] = nothing
         self._name = name
+        self._cursor = cursor
     
     def __getitem__(self, item):
         if item in self._events:
@@ -261,7 +270,7 @@ class Button(Component):
         func,
         anchor: str = "topleft",
     ):
-        super().__init__(events, name)
+        super().__init__(events, name, pygame.SYSTEM_CURSOR_HAND)
         is_valid(fgcolor, "color")
         if bgcolor is not None:
             is_valid(bgcolor, "color")
@@ -288,6 +297,3 @@ class Button(Component):
                 self._last_clicked = perf_counter_ns()      # 标记当前时间
                 if self._last_clicked - last > 1_0000_0000: # 距离上一次按钮被点击超过了一亿纳秒（0.1 秒）
                     self._func()                            # 执行函数
-        #    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
-        # else:
-        #     pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)

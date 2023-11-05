@@ -17,5 +17,3 @@ python example.py
 ```
 
 其中，[example.py](example.py) 是一个使用 Pygame Adder 的例子，您可以任意修改它的源代码，然后查看修改后的效果。
-
-> **提示**：请手动安装 [更纱黑体字体](https://mirrors.tuna.tsinghua.edu.cn/github-release/be5invis/Sarasa-Gothic/)
