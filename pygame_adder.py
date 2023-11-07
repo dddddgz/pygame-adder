@@ -104,15 +104,15 @@ def untrace(component):
     _traced.remove(component)
 
 class Component(pygame.sprite.Sprite):
-    def __init__(self, events, name, anchor, cursor=pygame.SYSTEM_CURSOR_ARROW):
+    def __init__(self, events, name, image, cursor=pygame.SYSTEM_CURSOR_ARROW):
         """
         Component 的意思为组件。它是所有 Pygame Adder 组件的基类。
         :param events: 表示所有事件。
             {
                 event: function
             }
-        :param name: 组件的 anchor 点的位置
-        :param anchor: 组件的锚点（topleft, midtop, topright, midleft, center, midright, bottomleft, midbottom, bottomright）
+        :param name: 组件的中心点的位置
+        :param image: 组件的图像
         :param cursor: 当鼠标悬浮在 Component 上面时，显示的指针样式
         """
         if not isinstance(events, dict):
@@ -123,8 +123,10 @@ class Component(pygame.sprite.Sprite):
             if item not in events:
                 events[item] = nothing
         self._name = name
-        self._anchor = anchor
+        self.origin_image = image
+        self.image = image
         self._cursor = cursor
+        self._angle = 0
     
     def __getitem__(self, item):
         if item in self._events:
@@ -137,19 +139,30 @@ class Component(pygame.sprite.Sprite):
         """
         由子类扩展，每个类型的组件的刷新逻辑都不一样
         """
-        anchor_pos = getattr(self.rect, self._anchor)
-        self.rect = self.image.get_rect()
-        self.rect.__setattr__(self._anchor, anchor_pos)
+        self._angle %= 360                  # 让自己的旋转角度对 360 取余
+        pos = self.rect.center              # 保存当前图形的中心
+        new_surf = pygame.transform.rotate(self.origin_image, self._angle)
+                                            # 获取旋转后的新表面
+        self.image = new_surf               # 设置表面
+        self.rect = self.image.get_rect()   # 重新获取 rect
+        self.rect.center = pos              # 设置 center
 
     def move_to(self, pos):
         """
         按照锚点移动位置
-        :param pos: 新的坐标（按照 anchor）
+        :param pos: 新的坐标（中心点）
         """
-        setattr(self.rect, self._anchor, pos)
+        self.rect.center = pos
+    
+    def rotate(self, angle):
+        """
+        向逆时针旋转 angle 度
+        :param angle: 旋转的度数
+        """
+        self._angle += angle
 
 class Label(Component):
-    def __init__(self, events, text, font, pos, fgcolor, bgcolor=None, anchor="topleft"):
+    def __init__(self, events, text, font, pos, fgcolor, bgcolor=None):
         """
         Label（标签）是 Pygame Adder 中的一个文字显示工具。
         :param events: 见 Component
@@ -158,26 +171,17 @@ class Label(Component):
         :param pos: 组件的坐标
         :param fgcolor: 文字前景色（文字颜色）
         :param bgcolor: 文字背景色（不填默认为 None）
-        :param anchor: 见 Component
         """
-        super().__init__(events, text, anchor)
         self._font = font
         self.image = self._font.render(text, False, fgcolor, bgcolor)
-        self.rect = self.image.get_rect(**{anchor: pos})
-    
-    def flush(self):
-        """
-        刷新对象
-        """
-        super().flush()
-        anchor_pos = self.rect.__getattribute__(self._anchor)
+        super().__init__(events, text, self.image)
         self.rect = self.image.get_rect()
-        self.rect.__setattr__(self._anchor, anchor_pos)
+        self.rect.center = pos
 
 class Button(Component):
     def __init__(self, events, name, text, font, pos, size, fgcolor, bgcolor, func=nothing, anchor="topleft"):
-        super().__init__(events, name, anchor, pygame.SYSTEM_CURSOR_HAND)
         self.image = new_surface(size, bgcolor)
+        super().__init__(events, name, self.image, pygame.SYSTEM_CURSOR_HAND)
         text_surf = font.render(text, False, fgcolor)       # 按钮上的文字
         text_rect = text_surf.get_rect()                    # 给文字使用 Rect，便于固定在中心
         text_rect.center = (size[0] // 2, size[1] // 2)     # 设置中心点
@@ -190,10 +194,6 @@ class Button(Component):
         """
         刷新对象
         """
-        super().flush()
-        anchor_pos = getattr(self.rect, self._anchor)
-        self.rect = self.image.get_rect()
-        self.rect.__setattr__(self._anchor, anchor_pos)
         if self.rect.collidepoint(pygame.mouse.get_pos()):  # 鼠标移到了按钮上面
             if pygame.mouse.get_pressed()[0]:               # 鼠标左键按下
                 last = self._last_clicked                   # 保留上次时间
