@@ -38,13 +38,19 @@ def flush():
     screen.blit(_config["background"], (0, 0))                  # 在 screen 上绘制添加背景
     flag = False                                                # 是否已处理鼠标 hover 事件
     for component in _traced:                                   # 遍历已跟踪的 Component
-        component.flush()                                       # 刷新 Component
+        if hasattr(component, "flush"):                         # 刷新 Component
+            component.flush()
         screen.blit(component.image, component.rect)            # 绘制 Component
         if flag:
             continue
         if component.rect.collidepoint(pygame.mouse.get_pos()): # 如果鼠标悬浮在 component 上方
-            pygame.mouse.set_cursor(component._cursor)
+            if hasattr(component, "_cursor"):
+                pygame.mouse.set_cursor(component._cursor)
             flag = True
+            if pygame.mouse.get_pressed()[2]:
+                if hasattr(component, "right_menu"):
+                    print(component.right_menu)
+
     if not flag:
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
     pygame.display.flip()
@@ -104,7 +110,7 @@ def untrace(component):
     _traced.remove(component)
 
 class Component(pygame.sprite.Sprite):
-    def __init__(self, events, name, image, cursor=pygame.SYSTEM_CURSOR_ARROW):
+    def __init__(self, events, name, image, right_menu, cursor=pygame.SYSTEM_CURSOR_ARROW):
         """
         Component 的意思为组件。它是所有 Pygame Adder 组件的基类。
         :param events: 表示所有事件。
@@ -113,6 +119,7 @@ class Component(pygame.sprite.Sprite):
             }
         :param name: 组件的中心点的位置
         :param image: 组件的图像
+        :param right_menu: 右键菜单，[(item, func), ...]
         :param cursor: 当鼠标悬浮在 Component 上面时，显示的指针样式
         """
         if not isinstance(events, dict):
@@ -125,6 +132,7 @@ class Component(pygame.sprite.Sprite):
         self._name = name
         self.origin_image = image
         self.image = image
+        self.right_menu = right_menu
         self._cursor = cursor
         self._angle = 0
     
@@ -174,14 +182,14 @@ class Label(Component):
         """
         self._font = font
         self.image = self._font.render(text, False, fgcolor, bgcolor)
-        super().__init__(events, text, self.image)
+        super().__init__(events, text, self.image, [])
         self.rect = self.image.get_rect()
         self.rect.center = pos
 
 class Button(Component):
     def __init__(self, events, name, text, font, pos, size, fgcolor, bgcolor, func=nothing, anchor="topleft"):
         self.image = new_surface(size, bgcolor)
-        super().__init__(events, name, self.image, pygame.SYSTEM_CURSOR_HAND)
+        super().__init__(events, name, self.image, [], pygame.SYSTEM_CURSOR_HAND)
         text_surf = font.render(text, False, fgcolor)       # 按钮上的文字
         text_rect = text_surf.get_rect()                    # 给文字使用 Rect，便于固定在中心
         text_rect.center = (size[0] // 2, size[1] // 2)     # 设置中心点
