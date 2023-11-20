@@ -38,19 +38,27 @@ def flush():
     screen.blit(_config["background"], (0, 0))                  # 在 screen 上绘制添加背景
     flag = False                                                # 是否已处理鼠标 hover 事件
     for component in _traced:                                   # 遍历已跟踪的 Component
-        if hasattr(component, "flush"):                         # 刷新 Component
-            component.flush()
+        if hasattr(component, "flush"):                         # 如果 Component 有 flush() 函数
+            component.flush()                                   # 刷新 Component
         screen.blit(component.image, component.rect)            # 绘制 Component
-        if flag:
-            continue
+        if flag:                                                # 如果已经查找到鼠标悬浮的 Component
+            continue                                            # 跳过本次循环剩余部分
         if component.rect.collidepoint(pygame.mouse.get_pos()): # 如果鼠标悬浮在 component 上方
-            if hasattr(component, "_cursor"):
-                pygame.mouse.set_cursor(component._cursor)
-            flag = True
-            if pygame.mouse.get_pressed()[2]:
-                if hasattr(component, "right_menu"):
-                    print(component.right_menu)
-
+            if hasattr(component, "_cursor"):                   # 如果 Component 有 _cursor 属性
+                pygame.mouse.set_cursor(component._cursor)      # 设置鼠标样式
+            flag = True                                         # 接下来的循环都跳过
+            if pygame.mouse.get_pressed()[2]:                   # 如果鼠标按下了右键
+                if hasattr(component, "right_menu"):            # 如果 Component 有右键菜单的属性
+                    right_menu = component.right_menu           # 将右键菜单保存到变量里
+                    if right_menu:                              # 如果右键菜单包含内容
+                        surf = pygame.Surface((100, len(right_menu) * 20))
+                                                                # 创建新的 Surface
+                        font = pygame.font.SysFont("Microsoft Yahei UI", 15)
+                        i = 0
+                        for name, func in right_menu:           # 遍历右键菜单列表
+                            surf.blit(font.render(name, False, (255, 255, 255)), (0, i * 20))
+                            i += 1
+                        screen.blit(surf, pygame.mouse.get_pos())
     if not flag:
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
     pygame.display.flip()
@@ -61,10 +69,8 @@ def to_surface(x):
     :param x: 如上所述。
     :return: pygame.Surface
     """
-    if isinstance(x, str):
-        # 是一张图片的名称
-        if x.startswith("http"):
-            # 是网络图片
+    if isinstance(x, str):              # 是一张图片的路径 / 网络地址
+        if x.startswith("http"):        # 是网络图片（http / https 开头）
             image_name = x.split('/')[-1]
             if _system == "windows":    system(f"curl {x} -o {image_name}") # windows 系统，使用 curl
             if _system == "darwin":     system(f"curl -O {x}")              # mac 系统，使用 curl
@@ -73,7 +79,7 @@ def to_surface(x):
             if _system == "windows":            system(f"del {image_name}") # windows 系统，使用 del
             if _system in ["darwin", "linux"]:  system(f"rm {image_name}")  # mac/linux，使用 rm
         else:
-            x = pygame.image.load(x) # 是本地图片
+            x = pygame.image.load(x)    # 是本地图片
     return x
 
 def new_surface(size, bgcolor) -> pygame.Surface:
@@ -110,14 +116,13 @@ def untrace(component):
     _traced.remove(component)
 
 class Component(pygame.sprite.Sprite):
-    def __init__(self, events, name, image, right_menu, cursor=pygame.SYSTEM_CURSOR_ARROW):
+    def __init__(self, events, image, right_menu, cursor=pygame.SYSTEM_CURSOR_ARROW):
         """
         Component 的意思为组件。它是所有 Pygame Adder 组件的基类。
         :param events: 表示所有事件。
             {
                 event: function
             }
-        :param name: 组件的中心点的位置
         :param image: 组件的图像
         :param right_menu: 右键菜单，[(item, func), ...]
         :param cursor: 当鼠标悬浮在 Component 上面时，显示的指针样式
@@ -129,7 +134,6 @@ class Component(pygame.sprite.Sprite):
         for item in ["onclick", "ondoubleclick"]:
             if item not in events:
                 events[item] = nothing
-        self._name = name
         self.origin_image = image
         self.image = image
         self.right_menu = right_menu
@@ -139,9 +143,6 @@ class Component(pygame.sprite.Sprite):
     def __getitem__(self, item):
         if item in self._events:
             return self._events[item]
-
-    def __repr__(self):
-        return f"Component(self._name)"
 
     def flush(self):
         """
@@ -174,29 +175,41 @@ class Label(Component):
         """
         Label（标签）是 Pygame Adder 中的一个文字显示工具。
         :param events: 见 Component
-        :param text: 标签上显示的文字，将作为 name 提交给 Component
+        :param text: 标签上显示的文字
         :param font: 文字显示的字体
         :param pos: 组件的坐标
         :param fgcolor: 文字前景色（文字颜色）
         :param bgcolor: 文字背景色（不填默认为 None）
         """
         self._font = font
-        self.image = self._font.render(text, False, fgcolor, bgcolor)
-        super().__init__(events, text, self.image, [])
+        self.image = font.render(text, False, fgcolor, bgcolor)
+        super().__init__(events, self.image, [])
         self.rect = self.image.get_rect()
         self.rect.center = pos
 
 class Button(Component):
-    def __init__(self, events, name, text, font, pos, size, fgcolor, bgcolor, func=nothing, anchor="topleft"):
+    def __init__(self, events, text, font, pos, size, fgcolor, bgcolor, func=nothing):
+        """
+        Button（按钮）是 Pygame Adder 中的按钮，它可以接受鼠标点击事件，并为此做出反应。
+        :param events: 见 Component
+        :param text: 显示的文字
+        :param font: 文字的字体
+        :param pos: 按钮的坐标
+        :param size: 按钮的大小 (width, height)
+        :param fgcolor: 文字前景色（文字颜色）
+        :param bgcolor: 文字背景色
+        :param func: 当点击按钮时触发的函数（默认为 nothing）
+        """
         self.image = new_surface(size, bgcolor)
-        super().__init__(events, name, self.image, [], pygame.SYSTEM_CURSOR_HAND)
+        super().__init__(events, self.image, [], pygame.SYSTEM_CURSOR_HAND)
         text_surf = font.render(text, False, fgcolor)       # 按钮上的文字
         text_rect = text_surf.get_rect()                    # 给文字使用 Rect，便于固定在中心
         text_rect.center = (size[0] // 2, size[1] // 2)     # 设置中心点
         self._func = func                                   # 设置当点击时调用的函数
         self._last_clicked = perf_counter_ns()              # 上一次被点击的时间
         self.image.blit(text_surf, text_rect)               # 显示文字
-        self.rect = self.image.get_rect(**{anchor: pos})    # 计算位置
+        self.rect = self.image.get_rect()                   # 计算位置
+        self.rect.topleft = pos                             # 设置位置
     
     def flush(self):
         """
